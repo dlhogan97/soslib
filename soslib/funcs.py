@@ -1,12 +1,21 @@
+import numpy as np
 import pandas as pd
 import xarray as xr
 import datetime as dt
-import json
+import requests
 import pytz
 import ftplib
 import nctoolkit as nc
 
 def get_daily_radsys_data(start, end):
+    """Collects 1-minute daily radsys data.
+    
+    Variable include:
+    -----------------
+    start/end: Start/end datetime as string
+    -----------------
+    Returns: xarray dataset
+    """
     # url to request from
     base_url = 'https://gml.noaa.gov/aftp/data/radiation/campaigns/Format/ckp/'
 
@@ -63,7 +72,7 @@ def get_daily_radsys_data(start, end):
     return radsys_ds
 
 def met_data_formatting(ckp_df):
-    
+    """Formatting for radsys data"""
     # Convert DateTime column to datetime
     ckp_df['time'] = pd.to_datetime(ckp_df['time'], format='%Y %m %d %H %M')
     # Add column numbers
@@ -82,12 +91,33 @@ def met_data_formatting(ckp_df):
     return ckp_ds
 
 def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False): 
+    """Collects desired ASFS data.
+
+    Variable include:
+    -----------------
+    product:
+    Kettle Ponds product code: asfs30
+    Avery Picnic product code: asfs50
+    -----------------
+    product_lvl: 0, 1, 2
+    -----------------
+    avg_time: Averaging time either 10 or 30 minutes
+    -----------------
+    start/end: Start/end datetime as string
+    -----------------
+    raw: boolean for if raw data is desired
+    -----------------
+    Returns: xarray dataset
+    """
     # Change to datetime if not given in this format
     if not isinstance(start, dt.date): 
         start = dt.datetime.strptime(start,'%Y-%m-%d')
     if not isinstance(end, dt.date): 
         end = dt.datetime.strptime(end ,'%Y-%m-%d')
 
+    if product not in ['asfs30', 'asfs50']:
+        print('Check product name, must be asfs30 or asfs50')
+        return
     # Get all file names to iterate through
     files = get_asfs_files(product, product_lvl, avg_time, start, end, raw)
     
@@ -140,6 +170,61 @@ def get_asfs_files(product, product_lvl, avg_time, start, end, raw=False):
                     sel_files.append(file)
     print(f'Got {len(sel_files)} files!')
     return sel_files
+
+
+def get_awdb_data(site_ids, element="WTEQ", sdate=dt.datetime(1899,10,1), edate=dt.datetime.now(), orient="records", server="https://api.snowdata.info/", sesh=None):
+    """
+    Adapted from Beau Uriona: https://github.com/snowex-hackweek/space-station/blob/main/contributors/beau-uriona/get_data.ipynb
+    Takes a list of site ids or a single site id and by default returns SWE period of record data as a single or list of dataframes,
+    but user can pass args to modify data returned.
+    Variable include:
+    -----------------
+    site_ids: 
+    site_id takes the form of a triplet made from <network_site_id>:<state_abbrv>:<network> where network is either SNTL or MNST
+    -----------------
+    element: 
+    Valid elements include WTEQ, SNWD, PREC, SMS, STO, TAVG
+    -----------------
+    sdate: Start date as datetime object
+    -----------------
+    edate: End date as datetime object
+    -----------------
+    All other variables are not required
+    -----------------
+    Returns: dataframe
+    """
+    dfs = []
+    return_single = False
+    if not isinstance(site_ids, list):
+        site_ids = [site_ids]
+        return_single = True
+    for site_id in site_ids:
+        endpoint = "data/getDaily"
+        date_args = f"sDate={sdate:%Y-%m-%d}&eDate={edate:%Y-%m-%d}"
+        frmt_args = f"format=json&orient={orient}"
+        all_args = f"?triplet={site_id}&{date_args}&element={element}&{frmt_args}"
+        url = f"{server}{endpoint}{all_args}"
+        print(f"getting data for {site_id} {element} starting {sdate:%Y-%m-%d} and ending {edate:%Y-%m-%d}")
+        data_col_lbl = f"{site_id}" + ":" + f"{element}"
+        if sesh:
+            req = sesh.get(url)
+        else:
+            req = requests.get(url)
+        if req.ok:
+            df = pd.DataFrame.from_dict(req.json())
+            df.columns = ["Date", data_col_lbl]
+            df.set_index("Date", inplace=True)
+        else:
+            print("  No data returned!")
+            df = pd.DataFrame(
+                data=[
+                    {"Date": pd.NaT, data_col_lbl: np.nan}
+                ],
+            ).set_index("Date").dropna()
+        dfs.append(df)
+    if return_single:
+        return dfs[0]
+    return dfs
 
 def attribute_dict():
     ad = {"SZA":
