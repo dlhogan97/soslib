@@ -1,9 +1,0 @@
-README.md
-setup.py
-soslib/__init__.py
-soslib/funcs.py
-soslib.egg-info/PKG-INFO
-soslib.egg-info/SOURCES.txt
-soslib.egg-info/dependency_links.txt
-soslib.egg-info/requires.txt
-soslib.egg-info/top_level.txt
