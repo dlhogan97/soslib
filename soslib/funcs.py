@@ -127,7 +127,7 @@ def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False, drop_fr
     # Iterate to get datasets for each day
     for i, file in enumerate(files):
         # Grab file using nctoolkit
-        ds = nc.open_url( f'ftp://ftp1.esrl.noaa.gov/Observations/Campaigns/SPLASH/{product}/{product_lvl}_level_ingest/{file}')
+        ds = nc.open_url( f'ftp://ftp1.esrl.noaa.gov/Observations/Campaigns/SPLASH/{product}/{product_lvl}_level_ingest/{file}').to_xarray()
         print(f'Loading {file}...')
         
         # Drop frequency dimension, if desired
@@ -135,7 +135,7 @@ def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False, drop_fr
             print("Dropping freq dimension due to concatenation issues.")
             ds = ds.drop_dims('freq')
         # Add dataset to list
-        datasets.append(ds.to_xarray())
+        datasets.append(ds)
     
     # Concatenate files here
     all_file_ds = xr.concat(datasets,dim='time')
