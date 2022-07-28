@@ -90,7 +90,7 @@ def met_data_formatting(ckp_df):
     ckp_ds = ckp_df.set_index('time', drop=True).to_xarray()
     return ckp_ds
 
-def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False): 
+def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False, drop_freq=True): 
     """Collects desired ASFS data.
 
     Variable include:
@@ -129,7 +129,11 @@ def get_asfs_data(product, product_lvl, avg_time, start, end, raw=False):
         # Grab file using nctoolkit
         ds = nc.open_url( f'ftp://ftp1.esrl.noaa.gov/Observations/Campaigns/SPLASH/{product}/{product_lvl}_level_ingest/{file}')
         print(f'Loading {file}...')
-
+        
+        # Drop frequency dimension, if desired
+        if drop_freq:
+            print("Dropping freq dimension due to concatenation issues.")
+            ds = ds.drop_dims('freq')
         # Add dataset to list
         datasets.append(ds.to_xarray())
     
